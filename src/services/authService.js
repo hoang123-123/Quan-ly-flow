@@ -13,9 +13,12 @@ export const authService = {
             throw new Error('Missing Auth Config');
         }
         try {
-            // Chuyển đổi URL sang local proxy path
-            // Ví dụ: https://login.microsoftonline.com/... -> /ms-login/...
-            const tokenPath = RAW_TOKEN_URL.replace('https://login.microsoftonline.com', '/ms-login');
+            // Nếu là môi trường phát triển (DEV), dùng Proxy để tránh CORS
+            // Nếu là môi trường Production (GitHub Pages), dùng URL trực tiếp (Yêu cầu API phải hỗ trợ CORS)
+            const isDev = import.meta.env.DEV;
+            const tokenPath = isDev
+                ? RAW_TOKEN_URL.replace('https://login.microsoftonline.com', '/ms-login')
+                : RAW_TOKEN_URL;
 
             const params = new URLSearchParams();
             params.append('grant_type', 'client_credentials');

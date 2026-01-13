@@ -21,6 +21,15 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_URL_LIST_FLOWS: ${{ secrets.VITE_URL_LIST_FLOWS }}
+          VITE_URL_GET_TOKEN: ${{ secrets.VITE_URL_GET_TOKEN }}
+          VITE_URL_GET_HISTORY: ${{ secrets.VITE_URL_GET_HISTORY }}
+          VITE_URL_GET_METADATA: ${{ secrets.VITE_URL_GET_METADATA }}
+          VITE_CLIENT_ID: ${{ secrets.VITE_CLIENT_ID }}
+          VITE_CLIENT_SECRET: ${{ secrets.VITE_CLIENT_SECRET }}
+          VITE_TENANT_ID: ${{ secrets.VITE_TENANT_ID }}
+          VITE_SCOPE: ${{ secrets.VITE_SCOPE }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

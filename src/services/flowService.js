@@ -46,12 +46,17 @@ export const flowService = {
      * Tạo URL từ Template trong ENV
      */
     formatApiUrl: (template, envId, flowId) => {
+        if (!template) return '';
         let url = template
             .replace('{environmentId}', envId)
             .replace('{flowId}', flowId);
 
-        // Áp dụng Proxy
-        return url.replace('https://api.flow.microsoft.com', '/flow-api');
+        // Nếu là môi trường phát triển (DEV), dùng Proxy để tránh CORS
+        if (import.meta.env.DEV) {
+            return url.replace('https://api.flow.microsoft.com', '/flow-api');
+        }
+        // Môi trường Production (GitHub Pages) dùng URL trực tiếp
+        return url;
     },
 
     /**
