@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { authService } from './authService';
 
-const URL_LIST_FLOWS = import.meta.env.VITE_URL_LIST_FLOWS || '';
-const URL_GET_HISTORY = import.meta.env.VITE_URL_GET_HISTORY || '';
-const URL_GET_METADATA = import.meta.env.VITE_URL_GET_METADATA || '';
+const URL_LIST_FLOWS = import.meta.env.VITE_URL_LIST_FLOWS || import.meta.env.VITE_FLOW_API_URL || import.meta.env.VITE_FLOW_API_UR || '';
+const URL_GET_HISTORY = import.meta.env.VITE_URL_GET_HISTORY || import.meta.env.VITE_POWER_PLATFORM_URL || '';
+const URL_GET_METADATA = import.meta.env.VITE_URL_GET_METADATA || import.meta.env.VITE_POWER_PLATFORM_URL || '';
 
 export const flowService = {
     /**

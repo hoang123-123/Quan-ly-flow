@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Chúng ta sẽ dùng URL thô từ ENV, nhưng vẫn qua Proxy để tránh CORS
-const RAW_TOKEN_URL = import.meta.env.VITE_URL_GET_TOKEN || '';
+const RAW_TOKEN_URL = import.meta.env.VITE_URL_GET_TOKEN || import.meta.env.VITE_TOKEN_URL || '';
 const CLIENT_ID = import.meta.env.VITE_CLIENT_ID || '';
 const CLIENT_SECRET = import.meta.env.VITE_CLIENT_SECRET || '';
 const SCOPE = import.meta.env.VITE_SCOPE || 'https://service.flow.microsoft.com/.default';
