@@ -3,6 +3,7 @@ import { flowService } from '../services/flowService';
 
 const FlowContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useFlowContext = () => {
     const context = useContext(FlowContext);
     if (!context) {
@@ -31,19 +32,6 @@ export const FlowProvider = ({ children }) => {
     const [unsharedFlows, setUnsharedFlows] = useState([]); // Flows bị lỗi permission
 
     const isMounted = useRef(true);
-
-    useEffect(() => {
-        isMounted.current = true;
-        initData();
-        return () => { isMounted.current = false; };
-    }, [initData]);
-
-    // Tự động fetch lại khi daysRange thay đổi
-    useEffect(() => {
-        if (flows.length > 0) {
-            refreshData(true);
-        }
-    }, [daysRange, flows.length, refreshData]);
 
     const initData = useCallback(async () => {
         setIsScanning(true);
@@ -147,6 +135,21 @@ export const FlowProvider = ({ children }) => {
 
         initData();
     }, [initData]);
+
+    useEffect(() => {
+        isMounted.current = true;
+        initData();
+        return () => { isMounted.current = false; };
+    }, [initData]);
+
+    // Tự động fetch lại khi daysRange thay đổi
+    useEffect(() => {
+        if (flows.length > 0) {
+            refreshData(true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [daysRange]);
+
 
     const stopScanning = () => {
         flowService.stopScanning();

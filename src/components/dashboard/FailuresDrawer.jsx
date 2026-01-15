@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import { X, Search, AlertCircle, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 20;
@@ -25,8 +25,11 @@ const FailuresDrawer = ({ isOpen, onClose, failures }) => {
     const [currentPage, setCurrentPage] = useState(1);
 
     // Reset page khi search thay đổi
-    const filteredData = useMemo(() => {
+    React.useEffect(() => {
         setCurrentPage(1);
+    }, [searchTerm]);
+
+    const filteredData = useMemo(() => {
         return (failures || []).filter(fail =>
             fail.flowName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             fail.error?.message?.toLowerCase().includes(searchTerm.toLowerCase())

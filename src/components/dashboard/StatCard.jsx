@@ -1,6 +1,6 @@
 import React from 'react';
 
-const StatCard = ({ title, value, icon: Icon, description, trend, className = "" }) => {
+const StatCard = ({ title, value, icon: Icon, description, className = "" }) => {
     return (
         <div className={`bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg ${className}`}>
             <div className="flex items-center justify-between space-x-4">
