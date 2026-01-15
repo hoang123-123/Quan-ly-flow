@@ -1,13 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, User, Hash, Info, ExternalLink, Zap, Activity, AlertTriangle, Loader2 } from 'lucide-react';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { X, Clock, User, Hash, Info, ExternalLink, Zap, Activity, AlertTriangle, Loader2, Copy, Check } from 'lucide-react';
 import { flowService } from '../services/flowService';
 
 const FlowDetail = ({ flow, onClose }) => {
   const [runs, setRuns] = useState([]);
+  const [metadata, setMetadata] = useState(null);
+  const [flowStructure, setFlowStructure] = useState({ trigger: null, actions: [] });
   const [loadingRuns, setLoadingRuns] = useState(false);
-  const [analysis, setAnalysis] = useState(null);
-  const [hasProxy, setHasProxy] = useState(!!import.meta.env.VITE_FLOW_RUNS_API_URL);
+  const [expandedRun, setExpandedRun] = useState(null);
+  const [copiedMetadata, setCopiedMetadata] = useState(false);
+
+  const handleCopyMetadata = () => {
+    if (!metadata) return;
+    navigator.clipboard.writeText(JSON.stringify(metadata, null, 2));
+    setCopiedMetadata(true);
+    setTimeout(() => setCopiedMetadata(false), 2000);
+  };
 
   useEffect(() => {
     if (flow) {
@@ -15,13 +24,14 @@ const FlowDetail = ({ flow, onClose }) => {
         setLoadingRuns(true);
         try {
           // Lấy cả metadata chi tiết và lịch sử chạy
-          const [metadata, history] = await Promise.all([
+          const [metadataRes, history] = await Promise.all([
             flowService.getFlowMetadata(flow),
             flowService.getFlowRuns(flow)
           ]);
 
+          setMetadata(metadataRes);
+          setFlowStructure(flowService.parseFlowStructure(metadataRes));
           setRuns(history);
-          setAnalysis(flowService.analyzeRuns(history));
         } catch (error) {
           console.error('Error fetching data:', error);
         } finally {
@@ -31,7 +41,9 @@ const FlowDetail = ({ flow, onClose }) => {
       fetchData();
     } else {
       setRuns([]);
-      setAnalysis(null);
+      setMetadata(null);
+      setFlowStructure({ trigger: null, actions: [] });
+      setExpandedRun(null);
     }
   }, [flow]);
 
@@ -41,13 +53,12 @@ const FlowDetail = ({ flow, onClose }) => {
   const isActive = flow.properties?.state === 'Started' || flow.state === 'Started' || flow.status === 'Active';
   const createdTime = flow.properties?.createdTime || flow.createdTime;
   const lastModifiedTime = flow.properties?.lastModifiedTime || flow.lastModifiedTime;
-  const flowId = flow.id || flow.name;
 
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex justify-end overflow-hidden">
         {/* Backdrop */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -56,7 +67,7 @@ const FlowDetail = ({ flow, onClose }) => {
         />
 
         {/* Sidebar Content */}
-        <motion.div
+        <Motion.div
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
@@ -79,87 +90,111 @@ const FlowDetail = ({ flow, onClose }) => {
           </div>
 
           <div className="p-8 space-y-10">
-            {/* Header Status */}
-            <div className="flex items-center gap-6 p-6 rounded-2xl bg-white/5 border border-white/10">
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Trạng thái hiện tại</p>
-                <div className="flex items-center gap-2">
-                  <span className={`text-2xl font-bold ${isActive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {isActive ? 'Đang hoạt động' : 'Đã dừng'}
-                  </span>
-                  <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+            {/* Header Status + Essential Metadata */}
+            <div className="relative pt-9 pb-6 px-6 rounded-2xl bg-slate-900/40 border border-white/12">
+              <span className="absolute top-0 left-6 -translate-y-1/2 bg-[#0f172a] px-3 text-xs font-black text-slate-500 tracking-[0.25em] uppercase z-10">
+                STATUS
+              </span>
+
+              <div className="space-y-6">
+                {/* Main Status Row */}
+                <div className="flex items-center gap-6">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-2xl font-bold ${isActive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {isActive ? 'Đang hoạt động' : 'Đã dừng'}
+                      </span>
+                      <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                    </div>
+                  </div>
+                  <a
+                    href={`https://make.powerautomate.com/environments/${flowService.parseFlowIds(flow).environmentId}/flows/${flowService.parseFlowIds(flow).flowId}/details`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-5 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
+                  >
+                    <ExternalLink size={16} />
+                    Mở trong Power Automate
+                  </a>
+                </div>
+
+                {/* Technical Metadata Row (Dates Only) */}
+                <div className="grid grid-cols-2 gap-4 pt-6 border-t border-white/5">
+                  <div className="flex items-start gap-3">
+                    <div className="p-1.5 rounded-lg bg-white/5">
+                      <Clock size={14} className="text-slate-500" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Ngày tạo</p>
+                      <p className="text-xs text-slate-400">
+                        {createdTime ? new Date(createdTime).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="p-1.5 rounded-lg bg-white/5">
+                      <Clock size={14} className="text-slate-500" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Cập nhật</p>
+                      <p className="text-xs text-slate-400">
+                        {lastModifiedTime ? new Date(lastModifiedTime).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <button className="px-5 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2">
-                <ExternalLink size={16} />
-                Mở trong Power Automate
-              </button>
             </div>
 
-            {/* Analysis Section */}
-            <section className="space-y-4">
-              <h3 className="text-sm font-semibold text-slate-400 flex items-center gap-2">
-                <Activity size={16} />
-                PHÂN TÍCH HIỆU SUẤT (GẦN ĐÂY)
-              </h3>
-
-              {!hasProxy && (
-                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs mb-4">
-                  <p className="flex items-center gap-2 font-semibold mb-1">
-                    <AlertTriangle size={14} />
-                    Yêu cầu cấu hình Proxy
-                  </p>
-                  Để xem dữ liệu lịch sử chạy chính xác, bạn cần cấu hình Proxy Flow trong `.env.local`.
-                </div>
-              )}
-
-              {analysis && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-6 rounded-2xl bg-white/5 border border-white/10 text-center">
-                    <p className="text-xs text-slate-500 font-medium mb-1">Xác suất lỗi</p>
-                    <p className={`text-3xl font-bold ${parseFloat(analysis.failureRate) > 20 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                      {analysis.failureRate}%
-                    </p>
+            {/* Flow Structure Section */}
+            {flowStructure.trigger && (
+              <div className="relative pt-9 pb-6 px-6 rounded-2xl bg-slate-900/40 border border-white/12">
+                <span className="absolute top-0 left-6 -translate-y-1/2 bg-[#0f172a] px-3 text-xs font-black text-slate-500 tracking-[0.25em] uppercase">
+                  FLOW STRUCTURE
+                </span>
+                <div className="space-y-4">
+                  {/* Trigger */}
+                  <div>
+                    <p className="text-xs text-slate-500 font-medium mb-2">🎯 Trigger</p>
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                      <span className="text-sm font-semibold text-blue-400">{flowStructure.trigger.name}</span>
+                      <span className="text-xs text-slate-400">({flowStructure.trigger.type})</span>
+                    </div>
                   </div>
-                  <div className="p-6 rounded-2xl bg-white/5 border border-white/10 text-center">
-                    <p className="text-xs text-slate-500 font-medium mb-1">Tổng lượt chạy</p>
-                    <p className="text-3xl font-bold text-white">{analysis.total || 0}</p>
-                  </div>
-                </div>
-              )}
 
-              {analysis?.commonErrors?.length > 0 && (
-                <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/10">
-                  <p className="text-xs font-semibold text-rose-400 flex items-center gap-1.5 mb-2">
-                    <AlertTriangle size={14} />
-                    CÁC LỖI THƯỜNG GẶP
-                  </p>
-                  <div className="space-y-1">
-                    {analysis.commonErrors.slice(0, 3).map((err, i) => (
-                      <div key={i} className="flex justify-between text-xs text-slate-400 capitalize">
-                        <span>{err.code}</span>
-                        <span className="font-mono text-rose-300">x{err.count}</span>
+                  {/* Actions */}
+                  {flowStructure.actions.length > 0 && (
+                    <div>
+                      <p className="text-xs text-slate-500 font-medium mb-2">📋 Actions ({flowStructure.actions.length})</p>
+                      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                        {flowStructure.actions.map((action, index) => (
+                          <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.02] border border-white/5 hover:bg-white/5 transition-colors">
+                            <span className="text-xs font-mono text-slate-500 w-6">{index + 1}.</span>
+                            <span className="text-sm font-medium text-white flex-1">{action.name}</span>
+                            <span className="text-xs text-slate-400 px-2 py-1 rounded bg-white/5">{action.type}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </section>
+              </div>
+            )}
 
             {/* Run History Table */}
-            <section className="space-y-4">
-              <h3 className="text-sm font-semibold text-slate-400 flex items-center gap-2">
-                <Clock size={16} />
-                LỊCH SỬ CHẠY GẦN ĐÂY
-              </h3>
-              <div className="rounded-xl border border-white/10 overflow-hidden">
+            <div className="relative pt-9 pb-1 rounded-2xl bg-slate-900/40 border border-white/12 space-y-0">
+              <span className="absolute top-0 left-6 -translate-y-1/2 bg-[#0f172a] px-3 text-xs font-black text-slate-500 tracking-[0.25em] uppercase z-10">
+                RUN HISTORY
+              </span>
+              <div className="rounded-b-2xl overflow-y-auto max-h-[300px] pr-2 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                 {loadingRuns ? (
                   <div className="p-10 text-center">
                     <Loader2 size={24} className="animate-spin text-blue-500 mx-auto" />
                     <p className="text-xs text-slate-500 mt-2">Đang tải lịch sử...</p>
                   </div>
                 ) : runs.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-slate-500 bg-white/5">
+                  <div className="p-6 text-center text-xs text-slate-500">
                     Không có lịch sử chạy dữ liệu hoặc lỗi kết nối.
                   </div>
                 ) : (
@@ -168,79 +203,94 @@ const FlowDetail = ({ flow, onClose }) => {
                       <tr className="bg-white/5 border-b border-white/10">
                         <th className="p-3 font-semibold text-slate-300">Thời gian</th>
                         <th className="p-3 font-semibold text-slate-300">Trạng thái</th>
+                        <th className="p-3 font-semibold text-slate-300">Lỗi tại / Chi tiết</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {runs.slice(0, 5).map((run, i) => {
+                      {runs.map((run, i) => {
                         const runProps = run.properties || run;
                         const status = runProps.status;
                         const startTime = runProps.startTime;
+                        const errorInfo = status === 'Failed' ? flowService.parseRunError(run) : null;
+                        const isExpanded = expandedRun === i;
+
                         return (
-                          <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                            <td className="p-3 text-slate-400 text-xs font-mono">
-                              {startTime ? new Date(startTime).toLocaleString('vi-VN', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                day: '2-digit',
-                                month: '2-digit'
-                              }) : 'N/A'}
-                            </td>
-                            <td className="p-3">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${status === 'Succeeded' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' :
-                                status === 'Failed' ? 'text-rose-400 bg-rose-400/10 border-rose-400/20' :
-                                  'text-blue-400 bg-blue-400/10 border-blue-400/20'
-                                }`}>
-                                {status?.toUpperCase() || 'UNKNOWN'}
-                              </span>
-                            </td>
-                          </tr>
+                          <React.Fragment key={i}>
+                            <tr
+                              className={`transition-colors cursor-pointer ${isExpanded ? 'bg-white/10' : 'hover:bg-white/[0.04]'}`}
+                              onClick={() => status === 'Failed' && setExpandedRun(isExpanded ? null : i)}
+                            >
+                              <td className="p-3 text-slate-400 text-xs font-mono">
+                                {startTime ? new Date(startTime).toLocaleString('vi-VN', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  day: '2-digit',
+                                  month: '2-digit'
+                                }) : 'N/A'}
+                              </td>
+                              <td className="p-3">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${status === 'Succeeded' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' :
+                                  status === 'Failed' ? 'text-rose-400 bg-rose-400/10 border-rose-400/20' :
+                                    'text-blue-400 bg-blue-400/10 border-blue-400/20'
+                                  }`}>
+                                  {status?.toUpperCase() || 'UNKNOWN'}
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                {errorInfo ? (
+                                  <div className="flex flex-col">
+                                    <span className="text-xs text-rose-400 font-medium">Lỗi: {errorInfo.action}</span>
+                                    <span className="text-[10px] text-slate-500 italic">Code: {errorInfo.code}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-slate-600">—</span>
+                                )}
+                              </td>
+                            </tr>
+                            {isExpanded && errorInfo && (
+                              <tr className="bg-rose-500/5">
+                                <td colSpan="3" className="p-4 border-b border-rose-500/10">
+                                  <div className="p-3 rounded-lg bg-black/40 border border-rose-500/20">
+                                    <p className="text-[11px] text-rose-300/80 font-mono whitespace-pre-wrap break-all leading-relaxed">
+                                      {errorInfo.message}
+                                    </p>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         );
                       })}
                     </tbody>
                   </table>
                 )}
               </div>
-            </section>
+            </div>
 
-            {/* Information Grid */}
-            <section className="space-y-6">
-              <h3 className="text-sm font-semibold text-slate-400 flex items-center gap-2">
-                <Info size={16} />
-                THÔNG TIN CHI TIẾT
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
-                <InfoItem icon={Hash} label="Flow ID" value={flowId} />
-                <InfoItem icon={Clock} label="Ngày tạo" value={createdTime ? new Date(createdTime).toLocaleString('vi-VN') : 'N/A'} />
-                <InfoItem icon={Clock} label="Chỉnh sửa lần cuối" value={lastModifiedTime ? new Date(lastModifiedTime).toLocaleString('vi-VN') : 'N/A'} />
-              </div>
-            </section>
-
-            {/* Raw JSON for Debugging Admin */}
-            <section className="space-y-4">
-              <h3 className="text-sm font-semibold text-slate-400">DỮ LIỆU GỐC (RAW DATA)</h3>
-              <div className="p-4 rounded-xl bg-black/40 border border-white/5 overflow-x-auto">
+            {/* Metadata for Debugging */}
+            <div className="relative pt-9 pb-6 px-6 rounded-2xl bg-slate-900/40 border border-white/12">
+              <span className="absolute top-0 left-6 -translate-y-1/2 bg-[#0f172a] px-3 text-xs font-black text-slate-500 tracking-[0.25em] uppercase z-10 flex items-center gap-2">
+                METADATA
+                <button
+                  onClick={handleCopyMetadata}
+                  className={`p-1 rounded hover:bg-white/10 transition-all ${copiedMetadata ? 'text-emerald-400' : 'text-slate-500 hover:text-white'}`}
+                  title="Copy JSON structure"
+                >
+                  {copiedMetadata ? <Check size={14} /> : <Copy size={14} />}
+                </button>
+              </span>
+              <div className="p-4 rounded-xl bg-black/40 border border-white/5 overflow-auto max-h-[300px] scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                 <pre className="text-xs text-blue-300/80 font-mono">
-                  {JSON.stringify(flow, null, 2)}
+                  {metadata ? JSON.stringify(metadata, null, 2) : 'Đang tải metadata...'}
                 </pre>
               </div>
-            </section>
+            </div>
           </div>
-        </motion.div>
+        </Motion.div>
       </div>
     </AnimatePresence>
   );
 };
 
-const InfoItem = ({ icon: Icon, label, value }) => (
-  <div className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/5 transition-colors">
-    <div className="p-2 rounded-lg bg-slate-800 text-slate-400">
-      <Icon size={18} />
-    </div>
-    <div>
-      <p className="text-xs text-slate-500 font-medium">{label}</p>
-      <p className="text-sm text-white font-semibold mt-0.5 break-all">{value}</p>
-    </div>
-  </div>
-);
 
 export default FlowDetail;

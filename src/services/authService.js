@@ -1,45 +1,53 @@
 import axios from 'axios';
 
-// Chúng ta sẽ dùng URL thô từ ENV, nhưng vẫn qua Proxy để tránh CORS
-const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
-const RAW_TOKEN_URL = import.meta.env.VITE_URL_GET_TOKEN ||
-    import.meta.env.VITE_TOKEN_URL ||
-    (TENANT_ID ? `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token` : '');
+// Biến môi trường lấy từ .env.local
+const RAW_TOKEN_URL = import.meta.env.VITE_URL_GET_TOKEN || '';
 
-const CLIENT_ID = import.meta.env.VITE_CLIENT_ID || '';
-const CLIENT_SECRET = import.meta.env.VITE_CLIENT_SECRET || '';
-const SCOPE = import.meta.env.VITE_SCOPE || 'https://service.flow.microsoft.com/.default';
+
+let cachedToken = null;
+let tokenExpiry = 0;
+let tokenRequestPromise = null;
 
 export const authService = {
     getAccessToken: async () => {
-        if (!RAW_TOKEN_URL || !CLIENT_ID || !CLIENT_SECRET) {
+        const now = Date.now();
+
+        // 1. Kiểm tra cache
+        if (cachedToken && now < (tokenExpiry - 300000)) {
+            return cachedToken;
+        }
+
+        // 2. Nếu đang có một request lấy token đang chạy, trả về promise đó
+        if (tokenRequestPromise) {
+            console.log('⏳ Đang đợi Token từ request song song...');
+            return tokenRequestPromise;
+        }
+
+        if (!RAW_TOKEN_URL) {
             console.error('Lỗi: Thiếu cấu hình Environment Variables cho Token API.');
             throw new Error('Missing Auth Config');
         }
-        try {
-            // Nếu là môi trường phát triển (DEV), dùng Proxy để tránh CORS
-            // Nếu là môi trường Production (GitHub Pages), dùng URL trực tiếp (Yêu cầu API phải hỗ trợ CORS)
-            const isDev = import.meta.env.DEV;
-            const tokenPath = isDev
-                ? RAW_TOKEN_URL.replace('https://login.microsoftonline.com', '/ms-login')
-                : RAW_TOKEN_URL;
 
-            const params = new URLSearchParams();
-            params.append('grant_type', 'client_credentials');
-            params.append('client_id', CLIENT_ID);
-            params.append('client_secret', CLIENT_SECRET);
-            params.append('scope', SCOPE);
+        // 3. Thực hiện lấy token mới và khóa lại (promise lock)
+        tokenRequestPromise = (async () => {
+            try {
+                console.log('🔑 Đang yêu cầu Token mới từ Proxy Server...');
+                const response = await axios.post(RAW_TOKEN_URL);
 
-            const response = await axios.post(tokenPath, params, {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            });
+                cachedToken = response.data.access_token;
+                tokenExpiry = Date.now() + (response.data.expires_in * 1000);
 
-            return response.data.access_token;
-        } catch (error) {
-            console.error('Lỗi khi lấy Access Token:', error.response?.data || error.message);
-            throw error;
-        }
+                console.log('✅ Đã lấy Token thành công. Hết hạn sau:', Math.round(response.data.expires_in / 60), 'phút');
+                return cachedToken;
+            } catch (error) {
+                console.error('❌ Lỗi khi lấy Access Token:', error.response?.data || error.message);
+                throw error;
+            } finally {
+                // Giải phóng khóa sau khi xong
+                tokenRequestPromise = null;
+            }
+        })();
+
+        return tokenRequestPromise;
     }
 };

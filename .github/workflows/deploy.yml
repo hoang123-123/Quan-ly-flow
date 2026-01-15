@@ -1,27 +1,37 @@
-name: Deploy
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches:
       - main
+  # Cho phép chạy thủ công từ tab Actions
+  workflow_dispatch:
+
+# Hủy các build cũ nếu có push mới cùng lúc
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20 # Cập nhật lên Node 20 LTS để tối ưu hiệu suất
+          cache: 'npm'    # Cache dependencies để build nhanh hơn
 
-      - name: Install
-        run: npm install
+      - name: Install dependencies
+        run: npm ci # Dùng 'ci' thay vì 'install' để đảm bảo tính nhất quán trên môi trường CI
 
-      - name: Build
+      - name: Build project
         run: npm run build
         env:
+          # Các biến môi trường lấy từ GitHub Secrets
           VITE_URL_LIST_FLOWS: ${{ secrets.VITE_URL_LIST_FLOWS || secrets.VITE_FLOW_API_UR }}
           VITE_URL_GET_TOKEN: ${{ secrets.VITE_URL_GET_TOKEN || secrets.VITE_TOKEN_URL }}
           VITE_URL_GET_HISTORY: ${{ secrets.VITE_URL_GET_HISTORY || secrets.VITE_POWER_PLATFORM_URL }}
@@ -30,9 +40,6 @@ jobs:
           VITE_CLIENT_SECRET: ${{ secrets.VITE_CLIENT_SECRET }}
           VITE_TENANT_ID: ${{ secrets.VITE_TENANT_ID }}
           VITE_SCOPE: ${{ secrets.VITE_SCOPE }}
-          VITE_FLOW_API_UR: ${{ secrets.VITE_FLOW_API_UR }}
-          VITE_TOKEN_URL: ${{ secrets.VITE_TOKEN_URL }}
-          VITE_POWER_PLATFORM_URL: ${{ secrets.VITE_POWER_PLATFORM_URL }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -46,6 +53,9 @@ jobs:
       id-token: write
     environment:
       name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/deploy-pages@v4
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
