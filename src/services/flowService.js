@@ -68,6 +68,7 @@ export const flowService = {
                         const user = response.data.value[0];
                         // Trích xuất tên từ crdfd_Employee2 nếu có, hoặc fallback
                         ownerName = user.crdfd_Employee2?.crdfd_name || user.fullname || 'Unknown';
+                        console.log(`👤 Owner Info [${userId}]:`, ownerName);
                     }
 
                     ownerCache.set(userId, ownerName);
@@ -111,7 +112,7 @@ export const flowService = {
      */
     clearRunsCache: () => {
         runsCache.clear();
-        console.log('🗑️ Đã xóa cache lịch sử chạy');
+
     },
 
     /**
@@ -127,13 +128,11 @@ export const flowService = {
     getFlows: async (forceRefresh = false) => {
         // 1. Nếu đã có dữ liệu và không ép Refresh, trả về luôn (Hủy yêu cầu gọi mới)
         if (!forceRefresh && flowsCache.data) {
-            console.log('♻️ Sử dụng danh sách Flows từ cache (Singleton)');
             return flowsCache.data;
         }
 
         // 2. Nếu đang trong quá trình chạy, trả về Promise hiện tại để dùng chung (Hủy yêu cầu chạy song song)
         if (flowService.pendingFlowsPromise) {
-            console.log('⏳ Đang có một yêu cầu lấy flows đang chạy, dùng chung kết quả...');
             return await flowService.pendingFlowsPromise;
         }
 
@@ -145,7 +144,6 @@ export const flowService = {
         // 3. Chỉ khởi động khi chưa có dữ liệu hoặc yêu cầu Refresh
         flowService.pendingFlowsPromise = (async () => {
             try {
-                console.log('🌐 Đang thực hiện gọi API lấy danh sách flows một lần duy nhất...');
                 const response = await axios.post(URL_LIST_FLOWS, {});
                 const data = response.data;
                 let flows = [];
@@ -213,16 +211,14 @@ export const flowService = {
             // 1. Kiểm tra cache
             const cacheKey = `${environmentId}_${flowId}`;
             if (metadataCache.has(cacheKey)) {
-                console.log(`♻️ Sử dụng Metadata từ cache cho flow: ${flowId}`);
+
                 return metadataCache.get(cacheKey);
             }
 
             const token = await authService.getAccessToken();
             const apiUrl = flowService.formatApiUrl(URL_GET_METADATA, environmentId, flowId);
 
-            console.log('🔍 Gọi API Metadata:');
-            console.log('URL:', apiUrl);
-            console.log('Token (50 ký tự đầu):', token?.substring(0, 50) + '...');
+
 
             const response = await axios.get(apiUrl, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -230,7 +226,7 @@ export const flowService = {
 
             // 2. Lưu vào cache
             metadataCache.set(cacheKey, response.data);
-            console.log('✅ Metadata đã được lưu vào cache');
+
             return response.data;
         } catch (error) {
             console.error('❌ Lỗi lấy metadata:', error.response?.data || error.message);
@@ -280,7 +276,7 @@ export const flowService = {
 
                 const filterDate = targetDate.toISOString().split('.')[0] + 'Z';
                 apiUrl += `&$filter=startTime ge ${filterDate}`;
-                console.log(`📅 [Filter] daysRange=${daysRange} (VN Midnight) → API ge ${filterDate}`);
+
             }
 
             const response = await axios.get(apiUrl, {
@@ -294,7 +290,7 @@ export const flowService = {
             const nextLink = response.data['@odata.nextLink'] || response.data.nextLink;
 
             if (currentRuns.length > 0 || nextLink) {
-                console.log(`📡 [API] ${flowId.substring(0, 6)}: Trang ${depth + 1} (+${currentRuns.length}) | Tổng: ${allRuns.length} | Có tiếp: ${!!nextLink}`);
+
             }
 
             if (!nextLink || depth >= 100) {

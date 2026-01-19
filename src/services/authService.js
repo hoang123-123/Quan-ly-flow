@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Biến môi trường lấy từ .env.local
 const RAW_TOKEN_URL = import.meta.env.VITE_URL_GET_TOKEN || '';
-console.log('Current Token URL (last 10 chars):', RAW_TOKEN_URL.slice(-10)); // Log debug
+
 
 
 let cachedToken = null;
@@ -20,7 +20,7 @@ export const authService = {
 
         // 2. Nếu đang có một request lấy token đang chạy, trả về promise đó
         if (tokenRequestPromise) {
-            console.log('⏳ Đang đợi Token từ request song song...');
+
             return tokenRequestPromise;
         }
 
@@ -32,13 +32,13 @@ export const authService = {
         // 3. Thực hiện lấy token mới và khóa lại (promise lock)
         tokenRequestPromise = (async () => {
             try {
-                console.log('🔑 Đang yêu cầu Token mới từ Proxy Server...');
+
                 const response = await axios.post(RAW_TOKEN_URL);
 
                 cachedToken = response.data.access_token;
                 tokenExpiry = Date.now() + (response.data.expires_in * 1000);
 
-                console.log('✅ Đã lấy Token thành công. Hết hạn sau:', Math.round(response.data.expires_in / 60), 'phút');
+
                 return cachedToken;
             } catch (error) {
                 console.error('❌ Lỗi khi lấy Access Token:', error.response?.data || error.message);
