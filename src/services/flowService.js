@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { authService } from './authService';
 
-const URL_LIST_FLOWS = import.meta.env.VITE_URL_LIST_FLOWS || '';
-const URL_GET_HISTORY = import.meta.env.VITE_URL_GET_HISTORY || '';
-const URL_GET_METADATA = import.meta.env.VITE_URL_GET_METADATA || '';
+const URL_LIST_FLOWS = import.meta.env.VITE_API_LIST_FLOWS || '';
+const URL_GET_HISTORY = import.meta.env.VITE_API_GET_HISTORY || '';
+const URL_GET_METADATA = import.meta.env.VITE_API_GET_METADATA || '';
 
 // Bộ nhớ đệm (Cache) để tránh gọi API trùng lặp
 const metadataCache = new Map();
@@ -45,11 +45,11 @@ export const flowService = {
             // 3. Create new request
             const requestPromise = (async () => {
                 try {
-                    const token = await authService.getAccessToken('OWNER');
-                    const DATAVERSE_URL = import.meta.env.VITE_DATAVERSE_URL;
+                    const token = await authService.getAccessToken('DATAVERSE');
+                    const DATAVERSE_URL = import.meta.env.VITE_API_DATAVERSE_URL;
 
                     if (!DATAVERSE_URL) {
-                        console.error('❌ [OwnerDebug] Missing VITE_DATAVERSE_URL');
+                        console.error('❌ [OwnerDebug] Missing VITE_API_DATAVERSE_URL');
                         return 'Unknown';
                     }
                     console.log(`🌐 [OwnerDebug] Fetching from: ${DATAVERSE_URL}`);
@@ -118,11 +118,13 @@ export const flowService = {
     },
 
     /**
-     * Lấy token (Proxy wrapper) - Default to General
+     * Lấy token (Proxy wrapper) - Default to FLOW
      */
-    getAccessToken: async (type = 'GENERAL') => {
+    getAccessToken: async (type = 'FLOW') => {
         return await authService.getAccessToken(type);
     },
+
+
 
     /**
      * Lấy danh sách flows (Có Cache & Request Deduplication)
@@ -217,7 +219,7 @@ export const flowService = {
                 return metadataCache.get(cacheKey);
             }
 
-            const token = await authService.getAccessToken('GENERAL');
+            const token = await authService.getAccessToken('FLOW');
             const apiUrl = flowService.formatApiUrl(URL_GET_METADATA, environmentId, flowId);
 
 

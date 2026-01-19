@@ -1,22 +1,22 @@
 import axios from 'axios';
 
 // Biến môi trường lấy từ .env.local
-const TOKEN_URL_OWNER = import.meta.env.VITE_URL_GET_TOKEN_OWNER || '';
-const TOKEN_URL_GENERAL = import.meta.env.VITE_URL_GET_TOKEN_GENERAL || '';
+const TOKEN_URL_DATAVERSE = import.meta.env.VITE_API_TOKEN_DATAVERSE || '';
+const TOKEN_URL_FLOW = import.meta.env.VITE_API_TOKEN_FLOW || '';
 
 const CACHE = {
-    OWNER: { token: null, expiry: 0, promise: null },
-    GENERAL: { token: null, expiry: 0, promise: null }
+    DATAVERSE: { token: null, expiry: 0, promise: null },
+    FLOW: { token: null, expiry: 0, promise: null }
 };
 
 export const authService = {
     /**
-     * Lấy Access Token dựa trên loại (OWNER hoặc GENERAL)
-     * @param {string} type - 'OWNER' | 'GENERAL'
+     * Lấy Access Token dựa trên loại (DATAVERSE hoặc FLOW)
+     * @param {string} type - 'DATAVERSE' | 'FLOW'
      */
-    getAccessToken: async (type = 'GENERAL') => {
-        const url = type === 'OWNER' ? TOKEN_URL_OWNER : TOKEN_URL_GENERAL;
-        const cache = CACHE[type] || CACHE.GENERAL;
+    getAccessToken: async (type = 'FLOW') => {
+        const url = type === 'DATAVERSE' ? TOKEN_URL_DATAVERSE : TOKEN_URL_FLOW;
+        const cache = CACHE[type] || CACHE.FLOW;
 
         if (!url) {
             console.error(`❌ [AuthService] Missing config for ${type} Token`);
