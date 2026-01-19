@@ -2,6 +2,7 @@ import axios from 'axios';
 
 // Biến môi trường lấy từ .env.local
 const RAW_TOKEN_URL = import.meta.env.VITE_URL_GET_TOKEN || '';
+console.log('Current Token URL (last 10 chars):', RAW_TOKEN_URL.slice(-10)); // Log debug
 
 
 let cachedToken = null;

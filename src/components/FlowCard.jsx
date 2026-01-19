@@ -1,5 +1,7 @@
-import { Play, Square, Clock, Activity, RefreshCw, ArrowUpRight } from 'lucide-react';
+import { Play, Square, Clock, Activity, RefreshCw, ArrowUpRight, User } from 'lucide-react';
 import { motion as Motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { flowService } from '../services/flowService';
 
 const FlowCard = ({ flow, onClick, isUpdating }) => {
     const isActive = flow.properties?.state === 'Started' || flow.state === 'Started' || flow.status === 'Active';
@@ -7,6 +9,22 @@ const FlowCard = ({ flow, onClick, isUpdating }) => {
     const modifiedTime = flow.properties?.lastModifiedTime || flow.lastModifiedTime;
     const todayRuns = flow.todayRuns || 0;
     const successRate = flow.successRate || 0;
+
+    const [ownerName, setOwnerName] = useState(null);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        // Chỉ fetch nếu chưa có ownerName
+        const fetchOwner = async () => {
+            const name = await flowService.getFlowOwner(flow);
+            if (isMounted) setOwnerName(name);
+        };
+
+        fetchOwner();
+
+        return () => { isMounted = false; };
+    }, [flow]);
 
     return (
         <Motion.div
@@ -59,10 +77,20 @@ const FlowCard = ({ flow, onClick, isUpdating }) => {
                 </div>
             </div>
 
-            {/* Row 4: Symmetrical Footer (Simplified, No UUID) */}
+            {/* Row 4: Symmetrical Footer (Owner + Date) */}
             <div className="flex items-center justify-between pt-1 text-[10px] font-normal">
                 <div className="flex items-center gap-2 text-slate-400 transition-colors group-hover:text-slate-300">
-                    <span className="uppercase tracking-widest text-[9px] opacity-80">Cập nhật:</span>
+                    <span className="uppercase tracking-widest text-[9px] opacity-80">Owner:</span>
+                    <div className="flex items-center gap-1.5 font-medium text-slate-300">
+                        <User size={10} className={ownerName ? "text-indigo-400" : "text-slate-600"} />
+                        <span className="tracking-tight truncate max-w-[100px]" title={ownerName || "Loading..."}>
+                            {ownerName || 'Checking...'}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-slate-400 transition-colors group-hover:text-slate-300">
+                    <span className="uppercase tracking-widest text-[9px] opacity-80">Update:</span>
                     <span className="font-mono tracking-tight text-slate-300">
                         {modifiedTime ? new Date(modifiedTime).toLocaleDateString('vi-VN') : '---'}
                     </span>

@@ -18,8 +18,77 @@ const systemStatsCache = {
     timestamp: 0,
     TTL: 5 * 60 * 1000 // 5 phút
 };
+const ownerCache = new Map();
+const ownerRequestPromises = new Map(); // Deduplication for concurrent requests
 
 export const flowService = {
+    /**
+     * Lấy tên Owner của Flow (Tối ưu: Cache + Request Deduplication + Minimal Select)
+     */
+    getFlowOwner: async (flow) => {
+        try {
+            const userId = flow?.properties?.creator?.userId;
+            if (!userId) return 'Unknown';
+
+            // 1. Check Cache
+            if (ownerCache.has(userId)) {
+                return ownerCache.get(userId);
+            }
+
+            // 2. Check Deduplication Promise
+            if (ownerRequestPromises.has(userId)) {
+                return await ownerRequestPromises.get(userId);
+            }
+
+            // 3. Create new request
+            const requestPromise = (async () => {
+                try {
+                    const token = await authService.getAccessToken();
+                    const DATAVERSE_URL = import.meta.env.VITE_DATAVERSE_URL;
+
+                    if (!DATAVERSE_URL) {
+                        console.warn('Thiếu cấu hình VITE_DATAVERSE_URL');
+                        return 'Unknown';
+                    }
+
+                    // Query tối ưu: Chỉ lấy cột crdfd_name
+                    const url = `${DATAVERSE_URL}/api/data/v9.2/systemusers?$filter=azureactivedirectoryobjectid eq '${userId}'&$expand=crdfd_Employee2($select=crdfd_name)`;
+
+                    const response = await axios.get(url, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/json',
+                            'OData-MaxVersion': '4.0',
+                            'OData-Version': '4.0'
+                        }
+                    });
+
+                    let ownerName = 'Unknown';
+                    if (response.data.value && response.data.value.length > 0) {
+                        const user = response.data.value[0];
+                        // Trích xuất tên từ crdfd_Employee2 nếu có, hoặc fallback
+                        ownerName = user.crdfd_Employee2?.crdfd_name || user.fullname || 'Unknown';
+                    }
+
+                    ownerCache.set(userId, ownerName);
+                    return ownerName;
+                } catch (error) {
+                    console.error(`Lỗi lấy Owner cho UserID ${userId}:`, error);
+                    return 'Unknown';
+                } finally {
+                    ownerRequestPromises.delete(userId);
+                }
+            })();
+
+            ownerRequestPromises.set(userId, requestPromise);
+            return await requestPromise;
+
+        } catch (e) {
+            console.error(e);
+            return 'Unknown';
+        }
+    },
+
     // Promise singleton để tránh gọi trùng lặp khi nhiều component cùng mount
     pendingFlowsPromise: null,
     isScanningAborted: false,
