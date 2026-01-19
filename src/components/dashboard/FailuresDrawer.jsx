@@ -97,15 +97,15 @@ const FailuresDrawer = ({ isOpen, onClose, failures }) => {
                         </div>
 
                         {/* Table */}
-                        <div className="flex-1 overflow-y-auto p-6">
+                        <div className="flex-1 overflow-y-auto px-6 pb-6">
                             <table className="w-full text-left text-sm text-slate-400">
-                                <thead className="text-slate-500 font-medium border-b border-slate-800 sticky top-0 bg-slate-900">
+                                <thead className="text-slate-500 font-medium border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
                                     <tr>
-                                        <th className="pb-3 pl-2">Flow name</th>
-                                        <th className="pb-3">Trigger type</th>
-                                        <th className="pb-3">Status</th>
-                                        <th className="pb-3">Run start</th>
-                                        <th className="pb-3">Error</th>
+                                        <th className="py-3 pl-2 w-[35%]">Flow name</th>
+                                        <th className="py-3 w-[15%]">Trigger type</th>
+                                        <th className="py-3 w-[10%]">Status</th>
+                                        <th className="py-3 w-[15%]">Run start</th>
+                                        <th className="py-3 w-[25%]">Error</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800">

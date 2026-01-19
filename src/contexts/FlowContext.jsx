@@ -37,7 +37,7 @@ export const FlowProvider = ({ children }) => {
         setIsScanning(true);
         try {
             // 1. Fetch Flows List immediately
-            console.log("🚀 [FlowContext] Fetching flows list...");
+
             const fetchedFlows = await flowService.getFlows();
 
             if (!isMounted.current) return;
@@ -55,7 +55,7 @@ export const FlowProvider = ({ children }) => {
                 flow.status === 'Active'
             );
 
-            console.log(`🚀 [FlowContext] Starting background runs fetch (Active: ${activeFlows.length}/${fetchedFlows.length}, Range: ${daysRange} days)...`);
+            // console.log(`🚀 [FlowContext] Starting background runs fetch (Active: ${activeFlows.length}/${fetchedFlows.length}, Range: ${daysRange} days)...`);
 
             const totalToProcess = activeFlows.length;
 

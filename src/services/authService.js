@@ -1,54 +1,64 @@
 import axios from 'axios';
 
 // Biến môi trường lấy từ .env.local
-const RAW_TOKEN_URL = import.meta.env.VITE_URL_GET_TOKEN || '';
+const TOKEN_URL_OWNER = import.meta.env.VITE_URL_GET_TOKEN_OWNER || '';
+const TOKEN_URL_GENERAL = import.meta.env.VITE_URL_GET_TOKEN_GENERAL || '';
 
-
-
-let cachedToken = null;
-let tokenExpiry = 0;
-let tokenRequestPromise = null;
+const CACHE = {
+    OWNER: { token: null, expiry: 0, promise: null },
+    GENERAL: { token: null, expiry: 0, promise: null }
+};
 
 export const authService = {
-    getAccessToken: async () => {
+    /**
+     * Lấy Access Token dựa trên loại (OWNER hoặc GENERAL)
+     * @param {string} type - 'OWNER' | 'GENERAL'
+     */
+    getAccessToken: async (type = 'GENERAL') => {
+        const url = type === 'OWNER' ? TOKEN_URL_OWNER : TOKEN_URL_GENERAL;
+        const cache = CACHE[type] || CACHE.GENERAL;
+
+        if (!url) {
+            console.error(`❌ [AuthService] Missing config for ${type} Token`);
+            return null;
+        }
+
         const now = Date.now();
 
         // 1. Kiểm tra cache
-        if (cachedToken && now < (tokenExpiry - 300000)) {
-            return cachedToken;
+        if (cache.token && now < (cache.expiry - 300000)) { // Refresh trước 5 phút
+            return cache.token;
         }
 
         // 2. Nếu đang có một request lấy token đang chạy, trả về promise đó
-        if (tokenRequestPromise) {
-
-            return tokenRequestPromise;
-        }
-
-        if (!RAW_TOKEN_URL) {
-            console.error('Lỗi: Thiếu cấu hình Environment Variables cho Token API.');
-            throw new Error('Missing Auth Config');
+        if (cache.promise) {
+            return cache.promise;
         }
 
         // 3. Thực hiện lấy token mới và khóa lại (promise lock)
-        tokenRequestPromise = (async () => {
+        cache.promise = (async () => {
             try {
+                console.log(`🔑 [AuthService] Requesting NEW ${type} Token...`);
+                // console.log(`URL: ${url}`); 
+                const response = await axios.post(url);
 
-                const response = await axios.post(RAW_TOKEN_URL);
+                if (!response.data || !response.data.access_token) {
+                    throw new Error('Invalid Token Response');
+                }
 
-                cachedToken = response.data.access_token;
-                tokenExpiry = Date.now() + (response.data.expires_in * 1000);
+                cache.token = response.data.access_token;
+                cache.expiry = Date.now() + (response.data.expires_in * 1000);
 
-
-                return cachedToken;
+                console.log(`✅ [AuthService] Got ${type} Token. Expires in ${Math.round(response.data.expires_in / 60)}m`);
+                return cache.token;
             } catch (error) {
-                console.error('❌ Lỗi khi lấy Access Token:', error.response?.data || error.message);
+                console.error(`❌ [AuthService] Error fetching ${type} token:`, error.message);
                 throw error;
             } finally {
-                // Giải phóng khóa sau khi xong
-                tokenRequestPromise = null;
+                cache.promise = null;
             }
         })();
 
-        return tokenRequestPromise;
+        return cache.promise;
     }
 };

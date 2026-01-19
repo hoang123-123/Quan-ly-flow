@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, User, Hash, Info, ExternalLink, Zap, Activity, AlertTriangle, Loader2, Copy, Check } from 'lucide-react';
+import { X, Clock, User, Hash, Info, ExternalLink, Zap, Activity, AlertTriangle, Loader2, Copy, Check, ArrowUpDown } from 'lucide-react';
 import { flowService } from '../services/flowService';
 
 const FlowDetail = ({ flow, onClose }) => {
@@ -10,6 +10,33 @@ const FlowDetail = ({ flow, onClose }) => {
   const [loadingRuns, setLoadingRuns] = useState(false);
   const [expandedRun, setExpandedRun] = useState(null);
   const [copiedMetadata, setCopiedMetadata] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  // Handle sorting
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedRuns = React.useMemo(() => {
+    let sortableRuns = [...runs];
+    if (sortConfig.key) {
+      sortableRuns.sort((a, b) => {
+        if (sortConfig.key === 'status') {
+          const statusA = (a.properties?.status || a.status || '').toLowerCase();
+          const statusB = (b.properties?.status || b.status || '').toLowerCase();
+          if (statusA < statusB) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (statusA > statusB) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
+        }
+        return 0;
+      });
+    }
+    return sortableRuns;
+  }, [runs, sortConfig]);
 
   const handleCopyMetadata = () => {
     if (!metadata) return;
@@ -202,12 +229,18 @@ const FlowDetail = ({ flow, onClose }) => {
                     <thead>
                       <tr className="bg-white/5 border-b border-white/10">
                         <th className="p-3 font-semibold text-slate-300">Thời gian</th>
-                        <th className="p-3 font-semibold text-slate-300">Trạng thái</th>
+                        <th
+                          className="p-3 font-semibold text-slate-300 cursor-pointer hover:text-white transition-colors flex items-center gap-2"
+                          onClick={() => handleSort('status')}
+                        >
+                          Trạng thái
+                          <ArrowUpDown size={14} className={sortConfig.key === 'status' ? 'text-blue-400' : 'text-slate-500'} />
+                        </th>
                         <th className="p-3 font-semibold text-slate-300">Lỗi tại / Chi tiết</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {runs.map((run, i) => {
+                      {sortedRuns.map((run, i) => {
                         const runProps = run.properties || run;
                         const status = runProps.status;
                         const startTime = runProps.startTime;
@@ -220,13 +253,23 @@ const FlowDetail = ({ flow, onClose }) => {
                               className={`transition-colors cursor-pointer ${isExpanded ? 'bg-white/10' : 'hover:bg-white/[0.04]'}`}
                               onClick={() => status === 'Failed' && setExpandedRun(isExpanded ? null : i)}
                             >
-                              <td className="p-3 text-slate-400 text-xs font-mono">
-                                {startTime ? new Date(startTime).toLocaleString('vi-VN', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  day: '2-digit',
-                                  month: '2-digit'
-                                }) : 'N/A'}
+                              <td className="p-3 text-slate-400 text-xs font-mono group">
+                                <a
+                                  href={`https://make.powerautomate.com/environments/${flowService.parseFlowIds(flow).environmentId}/flows/${flowService.parseFlowIds(flow).flowId}/runs/${run.name}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 hover:text-blue-400 stop-propagation group/link"
+                                  onClick={(e) => e.stopPropagation()}
+                                  title="Xem chi tiết trên Power Automate"
+                                >
+                                  {startTime ? new Date(startTime).toLocaleString('vi-VN', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    day: '2-digit',
+                                    month: '2-digit'
+                                  }) : 'N/A'}
+                                  <ExternalLink size={12} className="opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                                </a>
                               </td>
                               <td className="p-3">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${status === 'Succeeded' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' :

@@ -34,7 +34,7 @@ const FailuresTable = ({ failures, onSeeAll }) => {
 
     if (!failures || failures.length === 0) {
         return (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg h-full flex flex-col items-center justify-center text-slate-500">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg flex flex-col items-center justify-center text-slate-500 h-[200px] mb-8">
                 <AlertCircle className="w-8 h-8 mb-2 opacity-50" />
                 <p>No recent failures found.</p>
             </div>
@@ -42,8 +42,8 @@ const FailuresTable = ({ failures, onSeeAll }) => {
     }
 
     return (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg overflow-hidden">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg overflow-hidden flex flex-col h-[680px] mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 flex-shrink-0">
                 <div className="flex items-center space-x-2">
                     <h3 className="text-lg font-semibold text-slate-200">Flow run failures</h3>
                     <AlertCircle className="w-4 h-4 text-slate-400" />
@@ -69,9 +69,9 @@ const FailuresTable = ({ failures, onSeeAll }) => {
                 </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto flex-1 mb-4">
                 <table className="w-full text-left text-sm text-slate-400">
-                    <thead className="text-slate-500 font-medium border-b border-slate-800">
+                    <thead className="text-slate-500 font-medium border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
                         <tr>
                             <th className="pb-3 pl-2">Flow name</th>
                             <th className="pb-3">Trigger type</th>
@@ -140,13 +140,14 @@ const FailuresTable = ({ failures, onSeeAll }) => {
                 </table>
             </div>
 
-            {filteredFailures.length > 10 && (
-                <div className="mt-4 text-center">
-                    <span className="text-xs text-slate-500">
-                        Hiển thị 10 / {filteredFailures.length} kết quả. <button onClick={onSeeAll} className="text-blue-400 hover:underline">Xem tất cả</button>
-                    </span>
-                </div>
-            )}
+            <div className="text-center flex-shrink-0 border-t border-slate-800 p-4 -mx-6 -mb-6 bg-slate-800/50 rounded-b-xl backdrop-blur-sm">
+                <span className="text-xs text-slate-400 font-medium">
+                    Hiển thị {displayData.length} / {filteredFailures.length} kết quả.
+                    {filteredFailures.length > 10 && (
+                        <button onClick={onSeeAll} className="text-blue-400 hover:underline ml-1">Xem tất cả</button>
+                    )}
+                </span>
+            </div>
         </div>
     );
 };

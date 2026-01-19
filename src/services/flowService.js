@@ -28,10 +28,12 @@ export const flowService = {
     getFlowOwner: async (flow) => {
         try {
             const userId = flow?.properties?.creator?.userId;
+            console.log(`🔍 [OwnerDebug] Flow: ${flow?.name}, UserID: ${userId}`);
             if (!userId) return 'Unknown';
 
             // 1. Check Cache
             if (ownerCache.has(userId)) {
+                console.log(`♻️ [OwnerDebug] Cache Hit: ${userId}`);
                 return ownerCache.get(userId);
             }
 
@@ -43,13 +45,14 @@ export const flowService = {
             // 3. Create new request
             const requestPromise = (async () => {
                 try {
-                    const token = await authService.getAccessToken();
+                    const token = await authService.getAccessToken('OWNER');
                     const DATAVERSE_URL = import.meta.env.VITE_DATAVERSE_URL;
 
                     if (!DATAVERSE_URL) {
-                        console.warn('Thiếu cấu hình VITE_DATAVERSE_URL');
+                        console.error('❌ [OwnerDebug] Missing VITE_DATAVERSE_URL');
                         return 'Unknown';
                     }
+                    console.log(`🌐 [OwnerDebug] Fetching from: ${DATAVERSE_URL}`);
 
                     // Query tối ưu: Chỉ lấy cột crdfd_name
                     const url = `${DATAVERSE_URL}/api/data/v9.2/systemusers?$filter=azureactivedirectoryobjectid eq '${userId}'&$expand=crdfd_Employee2($select=crdfd_name)`;
@@ -66,7 +69,6 @@ export const flowService = {
                     let ownerName = 'Unknown';
                     if (response.data.value && response.data.value.length > 0) {
                         const user = response.data.value[0];
-                        // Trích xuất tên từ crdfd_Employee2 nếu có, hoặc fallback
                         ownerName = user.crdfd_Employee2?.crdfd_name || user.fullname || 'Unknown';
                         console.log(`👤 Owner Info [${userId}]:`, ownerName);
                     }
@@ -116,10 +118,10 @@ export const flowService = {
     },
 
     /**
-     * Lấy token (Proxy wrapper)
+     * Lấy token (Proxy wrapper) - Default to General
      */
-    getAccessToken: async () => {
-        return await authService.getAccessToken();
+    getAccessToken: async (type = 'GENERAL') => {
+        return await authService.getAccessToken(type);
     },
 
     /**
@@ -215,7 +217,7 @@ export const flowService = {
                 return metadataCache.get(cacheKey);
             }
 
-            const token = await authService.getAccessToken();
+            const token = await authService.getAccessToken('GENERAL');
             const apiUrl = flowService.formatApiUrl(URL_GET_METADATA, environmentId, flowId);
 
 
@@ -289,9 +291,7 @@ export const flowService = {
             // Power Automate API có thể dùng 'nextLink' hoặc '@odata.nextLink'
             const nextLink = response.data['@odata.nextLink'] || response.data.nextLink;
 
-            if (currentRuns.length > 0 || nextLink) {
 
-            }
 
             if (!nextLink || depth >= 100) {
                 if (depth === 0) runsCache.set(cacheKey, allRuns);
