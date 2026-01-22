@@ -141,7 +141,7 @@ export const flowService = {
         }
 
         if (!URL_LIST_FLOWS) {
-            console.warn('Cảnh báo: VITE_URL_LIST_FLOWS chưa được cấu hình');
+            console.warn('Cảnh báo: VITE_API_LIST_FLOWS chưa được cấu hình');
             return [];
         }
 

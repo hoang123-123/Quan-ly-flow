@@ -32,10 +32,13 @@ jobs:
         run: npm run build
         env:
           # Các biến môi trường lấy từ GitHub Secrets
-          VITE_URL_LIST_FLOWS: ${{ secrets.VITE_URL_LIST_FLOWS || secrets.VITE_FLOW_API_UR }}
-          VITE_URL_GET_TOKEN: ${{ secrets.VITE_URL_GET_TOKEN || secrets.VITE_TOKEN_URL }}
-          VITE_URL_GET_HISTORY: ${{ secrets.VITE_URL_GET_HISTORY || secrets.VITE_POWER_PLATFORM_URL }}
-          VITE_URL_GET_METADATA: ${{ secrets.VITE_URL_GET_METADATA || secrets.VITE_POWER_PLATFORM_URL }}
+          VITE_ENVIRONMENT_ID: ${{ secrets.VITE_ENVIRONMENT_ID }}
+          VITE_API_LIST_FLOWS: ${{ secrets.VITE_API_LIST_FLOWS }}
+          VITE_API_GET_HISTORY: ${{ secrets.VITE_API_GET_HISTORY }}
+          VITE_API_GET_METADATA: ${{ secrets.VITE_API_GET_METADATA }}
+          VITE_API_DATAVERSE_URL: ${{ secrets.VITE_API_DATAVERSE_URL }}
+          VITE_API_TOKEN_DATAVERSE: ${{ secrets.VITE_API_TOKEN_DATAVERSE }}
+          VITE_API_TOKEN_FLOW: ${{ secrets.VITE_API_TOKEN_FLOW }}
           VITE_CLIENT_ID: ${{ secrets.VITE_CLIENT_ID }}
           VITE_CLIENT_SECRET: ${{ secrets.VITE_CLIENT_SECRET }}
           VITE_TENANT_ID: ${{ secrets.VITE_TENANT_ID }}
