@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, Filter, RefreshCw, AlertTriangle, ListFilter, Activity, Square, Calendar } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Search, Filter, RefreshCw, AlertTriangle, ListFilter, Activity, Square, Calendar, User } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import FlowCard from './FlowCard';
 import FlowDetail from './FlowDetail';
@@ -7,24 +7,36 @@ import { useFlowContext } from '../contexts/FlowContext';
 
 const FlowList = () => {
     // Sử dụng Global Context
-    const { flows, runsMap, isScanning, syncedFlowIds, refreshData, loadingProgress, stopScanning, daysRange, setDaysRange } = useFlowContext();
+    const { flows, runsMap, isScanning, syncedFlowIds, refreshData, loadingProgress, stopScanning, daysRange, setDaysRange, ownersMap, isFetchingOwners } = useFlowContext();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('all');
+    const [ownerFilter, setOwnerFilter] = useState('all'); // New: Owner filter
     const [selectedFlow, setSelectedFlow] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 9;
 
+    // Tính danh sách unique owners từ ownersMap
+    const uniqueOwners = useMemo(() => {
+        const owners = Object.values(ownersMap).filter(o => o && o !== 'Unknown');
+        return [...new Set(owners)].sort();
+    }, [ownersMap]);
+
 
 
     const filteredFlows = flows.filter(flow => {
+        const flowId = flow.name || flow.id;
         const name = (flow.properties?.displayName || flow.name || '').toLowerCase();
         const isActive = flow.properties?.state === 'Started' || flow.state === 'Started' || flow.status === 'Active';
+        const flowOwner = ownersMap[flowId] || 'Unknown';
+
         const matchesSearch = name.includes(searchQuery.toLowerCase());
         const matchesFilter = activeFilter === 'all' ||
             (activeFilter === 'active' && isActive) ||
             (activeFilter === 'disabled' && !isActive);
-        return matchesSearch && matchesFilter;
+        const matchesOwner = ownerFilter === 'all' || flowOwner === ownerFilter;
+
+        return matchesSearch && matchesFilter && matchesOwner;
     });
 
     const totalPages = Math.ceil(filteredFlows.length / ITEMS_PER_PAGE);
@@ -48,13 +60,15 @@ const FlowList = () => {
         const successRate = totalRuns > 0 ? ((successfulRuns / totalRuns) * 100).toFixed(1) : null;
 
         const isActive = flow.properties?.state === 'Started' || flow.state === 'Started' || flow.status === 'Active';
+        const flowOwner = ownersMap[flow.name] || 'Unknown';
 
         return {
             ...flow,
             todayRuns: todayRunsCount,
             successRate: successRate,
             hasHistory: runs.length > 0,
-            isUpdating: isScanning && isActive && !syncedFlowIds.has(flow.name)
+            isUpdating: isScanning && isActive && !syncedFlowIds.has(flow.name),
+            owner: flowOwner
         };
     });
 
@@ -90,6 +104,26 @@ const FlowList = () => {
                             <option value="7" className="bg-slate-900">7 Ngày</option>
                             <option value="30" className="bg-slate-900">30 Ngày</option>
                             <option value="90" className="bg-slate-900">90 Ngày</option>
+                        </select>
+                    </div>
+
+                    {/* Owner Filter Dropdown */}
+                    <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 h-11">
+                        <User size={16} className="text-emerald-400" />
+                        <select
+                            value={ownerFilter}
+                            onChange={(e) => { setOwnerFilter(e.target.value); setCurrentPage(1); }}
+                            className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer pr-2 max-w-[120px]"
+                            disabled={isFetchingOwners}
+                        >
+                            <option value="all" className="bg-slate-900">
+                                {isFetchingOwners ? 'Loading...' : 'Tất cả Owner'}
+                            </option>
+                            {uniqueOwners.map(owner => (
+                                <option key={owner} value={owner} className="bg-slate-900">
+                                    {owner}
+                                </option>
+                            ))}
                         </select>
                     </div>
 

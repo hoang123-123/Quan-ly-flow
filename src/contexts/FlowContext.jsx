@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { flowService } from '../services/flowService';
+import { logger } from '../utils/logger';
 
 const FlowContext = createContext();
 
@@ -30,6 +31,8 @@ export const FlowProvider = ({ children }) => {
     const [daysRange, setDaysRange] = useState(1); // Mặc định 1 ngày
     const [lastUpdated, setLastUpdated] = useState(null);
     const [unsharedFlows, setUnsharedFlows] = useState([]); // Flows bị lỗi permission
+    const [ownersMap, setOwnersMap] = useState({}); // Map: flowId -> ownerName
+    const [isFetchingOwners, setIsFetchingOwners] = useState(false);
 
     const isMounted = useRef(true);
 
@@ -65,6 +68,9 @@ export const FlowProvider = ({ children }) => {
                 return;
             }
 
+            // 3. Fetch owners for all flows in background (không blocking)
+            fetchOwnersInBackground(uniqueFlows);
+
             await flowService.fetchAllFlowsRunsBatched(activeFlows, (processedCount, partialStats, hasError, batchRunsMap, batchUnsharedFlows) => {
                 if (!isMounted.current) return;
 
@@ -99,14 +105,14 @@ export const FlowProvider = ({ children }) => {
                 }
 
                 if (hasError) {
-                    console.warn("⚠️ [FlowContext] Batch fetch stopped due to Auth Error.");
+                    logger.warn("⚠️ [FlowContext] Batch fetch stopped due to Auth Error.");
                 }
             }, daysRange);
 
             setLastUpdated(new Date());
 
         } catch (error) {
-            console.error("❌ [FlowContext] Initialization failed:", error);
+            logger.error("❌ [FlowContext] Initialization failed:", error);
         } finally {
             if (isMounted.current) setIsScanning(false);
         }
@@ -129,6 +135,7 @@ export const FlowProvider = ({ children }) => {
         setSyncedFlowIds(new Set());
         setLastUpdated(null);
         setUnsharedFlows([]);
+        setOwnersMap({});
 
         // Xóa cache history để tải mới theo số ngày mới
         flowService.clearRunsCache();
@@ -155,6 +162,51 @@ export const FlowProvider = ({ children }) => {
         flowService.stopScanning();
     };
 
+    /**
+     * Fetch owners for all flows in background (batched)
+     */
+    const fetchOwnersInBackground = useCallback(async (flowsList) => {
+        if (!flowsList || flowsList.length === 0) return;
+
+        setIsFetchingOwners(true);
+        const BATCH_SIZE = 10;
+        const newOwnersMap = {};
+
+        try {
+            for (let i = 0; i < flowsList.length; i += BATCH_SIZE) {
+                if (!isMounted.current) break;
+
+                const batch = flowsList.slice(i, i + BATCH_SIZE);
+                const ownerPromises = batch.map(flow =>
+                    flowService.getFlowOwner(flow).then(owner => ({
+                        flowId: flow.name || flow.id,
+                        owner
+                    }))
+                );
+
+                const results = await Promise.all(ownerPromises);
+                results.forEach(({ flowId, owner }) => {
+                    newOwnersMap[flowId] = owner;
+                });
+
+                // Update state incrementally
+                if (isMounted.current) {
+                    setOwnersMap(prev => ({ ...prev, ...newOwnersMap }));
+                }
+
+                // Delay between batches
+                if (i + BATCH_SIZE < flowsList.length) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+            }
+            logger.debug(`✅ [FlowContext] Fetched owners for ${Object.keys(newOwnersMap).length} flows`);
+        } catch (error) {
+            logger.error('❌ [FlowContext] Error fetching owners:', error);
+        } finally {
+            if (isMounted.current) setIsFetchingOwners(false);
+        }
+    }, []);
+
     return (
         <FlowContext.Provider value={{
             flows,
@@ -168,6 +220,8 @@ export const FlowProvider = ({ children }) => {
             lastUpdated,
             unsharedFlows,
             setUnsharedFlows,
+            ownersMap,
+            isFetchingOwners,
             refreshData,
             stopScanning
         }}>

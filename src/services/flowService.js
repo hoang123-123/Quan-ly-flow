@@ -1,9 +1,23 @@
 import axios from 'axios';
 import { authService } from './authService';
+import { logger } from '../utils/logger';
 
 const URL_LIST_FLOWS = import.meta.env.VITE_API_LIST_FLOWS || '';
 const URL_GET_HISTORY = import.meta.env.VITE_API_GET_HISTORY || '';
 const URL_GET_METADATA = import.meta.env.VITE_API_GET_METADATA || '';
+
+// LRU Cache Configuration
+const MAX_CACHE_SIZE = 500;
+
+/**
+ * Helper: Giới hạn kích thước cache (LRU - xóa item cũ nhất)
+ */
+const limitCacheSize = (cache, maxSize = MAX_CACHE_SIZE) => {
+    if (cache.size > maxSize) {
+        const firstKey = cache.keys().next().value;
+        cache.delete(firstKey);
+    }
+};
 
 // Bộ nhớ đệm (Cache) để tránh gọi API trùng lặp
 const metadataCache = new Map();
@@ -28,12 +42,12 @@ export const flowService = {
     getFlowOwner: async (flow) => {
         try {
             const userId = flow?.properties?.creator?.userId;
-            console.log(`🔍 [OwnerDebug] Flow: ${flow?.name}, UserID: ${userId}`);
+            logger.debug(`🔍 [OwnerDebug] Flow: ${flow?.name}, UserID: ${userId}`);
             if (!userId) return 'Unknown';
 
             // 1. Check Cache
             if (ownerCache.has(userId)) {
-                console.log(`♻️ [OwnerDebug] Cache Hit: ${userId}`);
+                logger.debug(`♻️ [OwnerDebug] Cache Hit: ${userId}`);
                 return ownerCache.get(userId);
             }
 
@@ -49,10 +63,10 @@ export const flowService = {
                     const DATAVERSE_URL = import.meta.env.VITE_API_DATAVERSE_URL;
 
                     if (!DATAVERSE_URL) {
-                        console.error('❌ [OwnerDebug] Missing VITE_API_DATAVERSE_URL');
+                        logger.error('❌ [OwnerDebug] Missing VITE_API_DATAVERSE_URL');
                         return 'Unknown';
                     }
-                    console.log(`🌐 [OwnerDebug] Fetching from: ${DATAVERSE_URL}`);
+                    logger.debug(`🌐 [OwnerDebug] Fetching from: ${DATAVERSE_URL}`);
 
                     // Query tối ưu: Chỉ lấy cột crdfd_name
                     const url = `${DATAVERSE_URL}/api/data/v9.2/systemusers?$filter=azureactivedirectoryobjectid eq '${userId}'&$expand=crdfd_Employee2($select=crdfd_name)`;
@@ -70,13 +84,14 @@ export const flowService = {
                     if (response.data.value && response.data.value.length > 0) {
                         const user = response.data.value[0];
                         ownerName = user.crdfd_Employee2?.crdfd_name || user.fullname || 'Unknown';
-                        console.log(`👤 Owner Info [${userId}]:`, ownerName);
+                        logger.debug(`👤 Owner Info [${userId}]:`, ownerName);
                     }
 
                     ownerCache.set(userId, ownerName);
+                    limitCacheSize(ownerCache);
                     return ownerName;
                 } catch (error) {
-                    console.error(`Lỗi lấy Owner cho UserID ${userId}:`, error);
+                    logger.error(`Lỗi lấy Owner cho UserID ${userId}:`, error);
                     return 'Unknown';
                 } finally {
                     ownerRequestPromises.delete(userId);
@@ -87,7 +102,7 @@ export const flowService = {
             return await requestPromise;
 
         } catch (e) {
-            console.error(e);
+            logger.error(e);
             return 'Unknown';
         }
     },
@@ -101,7 +116,7 @@ export const flowService = {
      * Dừng quá trình quét dữ liệu nền
      */
     stopScanning: () => {
-        console.warn('⏹️ Yêu cầu dừng quét dữ liệu từ người dùng...');
+        logger.warn('⏹️ Yêu cầu dừng quét dữ liệu từ người dùng...');
         flowService.isScanningAborted = true;
         if (flowService.scanAbortController) {
             flowService.scanAbortController.abort();
@@ -141,7 +156,7 @@ export const flowService = {
         }
 
         if (!URL_LIST_FLOWS) {
-            console.warn('Cảnh báo: VITE_API_LIST_FLOWS chưa được cấu hình');
+            logger.warn('Cảnh báo: VITE_API_LIST_FLOWS chưa được cấu hình');
             return [];
         }
 
@@ -159,7 +174,7 @@ export const flowService = {
                 flowsCache.timestamp = Date.now();
                 return flows;
             } catch (error) {
-                console.error('❌ Lỗi khi lấy danh sách flows:', error);
+                logger.error('❌ Lỗi khi lấy danh sách flows:', error);
                 // Nếu lỗi thì cho phép lần sau gọi lại (xóa promise)
                 throw error;
             } finally {
@@ -230,12 +245,13 @@ export const flowService = {
 
             // 2. Lưu vào cache
             metadataCache.set(cacheKey, response.data);
+            limitCacheSize(metadataCache);
 
             return response.data;
         } catch (error) {
-            console.error('❌ Lỗi lấy metadata:', error.response?.data || error.message);
-            console.error('Status:', error.response?.status);
-            console.error('Headers sent:', error.config?.headers);
+            logger.error('❌ Lỗi lấy metadata:', error.response?.data || error.message);
+            logger.debug('Status:', error.response?.status);
+            logger.debug('Headers sent:', error.config?.headers);
             return null;
         }
     },
@@ -296,14 +312,14 @@ export const flowService = {
 
 
             if (!nextLink || depth >= 100) {
-                if (depth === 0) runsCache.set(cacheKey, allRuns);
+                if (depth === 0) { runsCache.set(cacheKey, allRuns); limitCacheSize(runsCache); }
                 return allRuns;
             }
 
             await new Promise(resolve => setTimeout(resolve, 150));
             const finalRuns = await flowService.getFlowRuns(flow, nextLink, allRuns, depth + 1, daysRange);
 
-            if (depth === 0) runsCache.set(cacheKey, finalRuns);
+            if (depth === 0) { runsCache.set(cacheKey, finalRuns); limitCacheSize(runsCache); }
             return finalRuns;
         } catch (error) {
             if (axios.isCancel(error)) return accumulatedRuns;
@@ -315,12 +331,12 @@ export const flowService = {
             if (errCode === 'ConnectionAuthorizationFailed' ||
                 errCode === 'ConnectionNotAuthenticated' ||
                 error.response?.status === 403) {
-                console.warn(`⚠️ Bỏ qua flow [${flow?.name?.substring(0, 8)}...]: Không có quyền truy cập history (403).`);
+                logger.warn(`⚠️ Bỏ qua flow [${flow?.name?.substring(0, 8)}...]: Không có quyền truy cập history (403).`);
                 // Trả về marker đặc biệt để FlowContext biết flow này bị lỗi permission
                 return { __permissionError: true, flow };
             }
 
-            console.error(`❌ Lỗi History (Depth ${depth}):`, errData.message || error.message);
+            logger.error(`❌ Lỗi History (Depth ${depth}):`, errData.message || error.message);
             if (error.response?.status === 401) throw error;
             return accumulatedRuns;
         }
@@ -533,7 +549,7 @@ export const flowService = {
                 } catch (err) {
                     // Check if error is 401 Unauthorized
                     if (err.response && err.response.status === 401) {
-                        console.error('⛔ Auth Error (401) detected. Stopping batch fetch.');
+                        logger.error('⛔ Auth Error (401) detected. Stopping batch fetch.');
                         authErrorDetected = true;
                     }
                     return [];

@@ -2,8 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, User, Hash, Info, ExternalLink, Zap, Activity, AlertTriangle, Loader2, Copy, Check, ArrowUpDown } from 'lucide-react';
 import { flowService } from '../services/flowService';
+import { useFlowContext } from '../contexts/FlowContext';
+import { logger } from '../utils/logger';
 
 const FlowDetail = ({ flow, onClose }) => {
+  // Lấy runsMap từ context để tái sử dụng cached data
+  const { runsMap } = useFlowContext();
+
   const [runs, setRuns] = useState([]);
   const [metadata, setMetadata] = useState(null);
   const [flowStructure, setFlowStructure] = useState({ trigger: null, actions: [] });
@@ -50,17 +55,25 @@ const FlowDetail = ({ flow, onClose }) => {
       const fetchData = async () => {
         setLoadingRuns(true);
         try {
-          // Lấy cả metadata chi tiết và lịch sử chạy
-          const [metadataRes, history] = await Promise.all([
-            flowService.getFlowMetadata(flow),
-            flowService.getFlowRuns(flow)
-          ]);
+          // Kiểm tra xem runs đã có trong cache context chưa
+          const cachedRuns = runsMap[flow.name];
 
+          // Chỉ fetch metadata (runs đã có trong cache từ FlowContext)
+          const metadataRes = await flowService.getFlowMetadata(flow);
           setMetadata(metadataRes);
           setFlowStructure(flowService.parseFlowStructure(metadataRes));
-          setRuns(history);
+
+          // Sử dụng cached runs nếu có, nếu không thì fetch mới
+          if (cachedRuns && cachedRuns.length > 0) {
+            logger.debug(`♻️ [FlowDetail] Using cached runs for ${flow.name}: ${cachedRuns.length} runs`);
+            setRuns(cachedRuns);
+          } else {
+            logger.debug(`🔄 [FlowDetail] Fetching runs for ${flow.name} (no cache)`);
+            const history = await flowService.getFlowRuns(flow);
+            setRuns(history);
+          }
         } catch (error) {
-          console.error('Error fetching data:', error);
+          logger.error('Error fetching data:', error);
         } finally {
           setLoadingRuns(false);
         }
@@ -72,7 +85,8 @@ const FlowDetail = ({ flow, onClose }) => {
       setFlowStructure({ trigger: null, actions: [] });
       setExpandedRun(null);
     }
-  }, [flow]);
+  }, [flow, runsMap]);
+
 
   if (!flow) return null;
 
